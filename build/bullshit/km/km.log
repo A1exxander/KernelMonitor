@@ -1,0 +1,29 @@
+﻿  Building 'km' with toolset 'WindowsKernelModeDriver10.0' and the 'Universal' target platform.
+C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(516,5): warning MSB8004: Intermediate Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Intermediate Directory.
+C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(517,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
+  Stamping C:\Users\Alex\Downloads\km\build\bullshit\km\km.inf
+  Stamping [Version] section with DriverVer=10/18/2024,16.14.5.55
+  main.cpp
+C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\include\vcruntime.h(61,26): warning C4083: expected ')'; found identifier '_VCRUNTIME_DISABLED_WARNINGS'
+  (compiling source file 'main.cpp')
+  
+C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\include\vcruntime.h(111,1): warning C4005: '_CRT_STRINGIZE': macro redefinition
+  (compiling source file 'main.cpp')
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km\crt\crtdefs.h(85,1):
+  see previous definition of '_CRT_STRINGIZE'
+  
+C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\include\vcruntime.h(114,1): warning C4005: '_CRT_WIDE': macro redefinition
+  (compiling source file 'main.cpp')
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km\crt\crtdefs.h(88,1):
+  see previous definition of '_CRT_WIDE'
+  
+C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\include\vcruntime.h(155,1): warning C4005: '__CRTDECL': macro redefinition
+  (compiling source file 'main.cpp')
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km\crt\crtdefs.h(640,1):
+  see previous definition of '__CRTDECL'
+  
+C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\include\stdint.h(16,26): warning C4083: expected ')'; found identifier '_VCRUNTIME_DISABLED_WARNINGS'
+  (compiling source file 'main.cpp')
+  
+  km.vcxproj -> C:\Users\Alex\Downloads\km\build\whorlsdrv.sys
+  Driver is 'Universal'.
