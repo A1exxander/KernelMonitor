@@ -13,7 +13,6 @@ ULONGLONG m_stored_dtb;
 #include "req/cr3.h"
 #include "req/read_write.h"
 
-#pragma warning(disable:4100)
 #include <ntddk.h>
 #include "non-shit-code/IOCTLRequestExecutor.h"
 
