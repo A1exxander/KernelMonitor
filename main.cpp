@@ -54,7 +54,7 @@ NTSTATUS DeviceController(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 
             ULONG32 CPUTemp;
             RequestStatus = IOCTLRequestExecutor::ReadCPUTemp(CPUTemp);
-            RtlCopyMemory(PIOStackLocation->Parameters.DeviceIoControl.Type3InputBuffer, &CPUTemp, sizeof(CPUTemp)); // Create a function that can do this for us w any value
+            RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &CPUTemp, sizeof(CPUTemp)); // Create a function that can do this for us w any value
             Irp->IoStatus.Information = sizeof(CPUTemp);
             break;
 
@@ -67,7 +67,7 @@ NTSTATUS DeviceController(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 
             ULONG64 RAMUsageMB;
             RequestStatus = IOCTLRequestExecutor::ReadRAMUsage(RAMUsageMB);
-            RtlCopyMemory(PIOStackLocation->Parameters.DeviceIoControl.Type3InputBuffer, &RAMUsageMB, sizeof(RAMUsageMB));
+            RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &CPUTemp, sizeof(CPUTemp));
             Irp->IoStatus.Information = sizeof(RAMUsageMB);
             break;
 
@@ -112,6 +112,7 @@ NTSTATUS DeviceController(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 
         default:
             RequestStatus = STATUS_INVALID_DEVICE_REQUEST;
+
     }
 
     Irp->IoStatus.Status = RequestStatus;
