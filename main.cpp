@@ -15,13 +15,16 @@ ULONGLONG m_stored_dtb;
 
 #include <ntddk.h>
 #include "non-shit-code/IOCTLRequestExecutor.h"
+#include "non-shit-code/RequestCrypter.h"
 
 constexpr auto DEVICE_NAME = L"\\Device\\SystemResourceMonitoringTechnologies"; // A kernel mode driver to monitor hardware components directly and do the occasional funny trick
 constexpr auto SYMBOLIC_LINK_NAME = L"\\DosDevices\\SystemResourceMonitoringTechnologies";
+constexpr auto TAG_NAME = 'KMHM';
 
 void UnloadDriver(PDRIVER_OBJECT DriverObject);
-
 NTSTATUS UnsupportedDispatch(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+
+RequestCrypter* requestCrypter;
 
 NTSTATUS DeviceController(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 
@@ -34,7 +37,7 @@ NTSTATUS DeviceController(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
         ReadWriteMemory = CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80C, METHOD_BUFFERED, FILE_ANY_ACCESS),
         ReadBaseAddress = CTL_CODE(FILE_DEVICE_UNKNOWN, 0x810, METHOD_BUFFERED, FILE_ANY_ACCESS),
         DTB = CTL_CODE(FILE_DEVICE_UNKNOWN, 0x814, METHOD_BUFFERED, FILE_ANY_ACCESS)                // Sure, whatever this means
-    
+
     };
 
     PIO_STACK_LOCATION PIOStackLocation = IoGetCurrentIrpStackLocation(Irp);
@@ -45,74 +48,69 @@ NTSTATUS DeviceController(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 
     switch (RequestType) {
 
-        case IOCTLCode::DetectCheat:
+    case IOCTLCode::DetectCheat:
 
-            IOCTLRequestExecutor::DetectCheat(0xDE7EC7ED);
-            break;
+        IOCTLRequestExecutor::DetectCheat(0xDE7EC7ED);
+        break;
 
-        case IOCTLCode::ReadCPUTemp:
+    case IOCTLCode::ReadCPUTemp:
+    
+        ULONG32 CPUTemp;
+        RequestStatus = IOCTLRequestExecutor::ReadCPUTemp(CPUTemp);
+        RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &CPUTemp, sizeof(CPUTemp)); // Create a function that can do this for us w any value
+        Irp->IoStatus.Information = sizeof(CPUTemp);
+        break;
 
-            ULONG32 CPUTemp;
-            RequestStatus = IOCTLRequestExecutor::ReadCPUTemp(CPUTemp);
-            RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &CPUTemp, sizeof(CPUTemp)); // Create a function that can do this for us w any value
-            Irp->IoStatus.Information = sizeof(CPUTemp);
-            break;
+    case IOCTLCode::ReadGPUTemp:
+        //IOCTLRequestHandler::ReadGPUTemp();
+        break;
 
-        case IOCTLCode::ReadGPUTemp:
+    case IOCTLCode::ReadMemoryUsage:
+   
+        ULONG64 RAMUsageMB;
+        RequestStatus = IOCTLRequestExecutor::ReadRAMUsage(RAMUsageMB);
+        RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &RAMUsageMB, sizeof(RAMUsageMB));
+        Irp->IoStatus.Information = sizeof(RAMUsageMB);
+        break;
 
-            //IOCTLRequestHandler::ReadGPUTemp();
-            break;
+    case IOCTLCode::ReadWriteMemory: // Fix all the trash below this please
 
-        case IOCTLCode::ReadMemoryUsage:
-
-            ULONG64 RAMUsageMB;
-            RequestStatus = IOCTLRequestExecutor::ReadRAMUsage(RAMUsageMB);
-            RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &CPUTemp, sizeof(CPUTemp));
-            Irp->IoStatus.Information = sizeof(RAMUsageMB);
-            break;
-
-        case IOCTLCode::ReadWriteMemory: // Fix all the trash below this please
-
-            if (RequestBufferSize == sizeof(_rw)) {
-                prw req = (prw)(Irp->AssociatedIrp.SystemBuffer);
-                RequestStatus = ReadWriteHandler(req);
-                RequestResponseSize = sizeof(_rw);
-            }
-            else {
-                RequestStatus = STATUS_INFO_LENGTH_MISMATCH;
-            }
-
-            break;
-
-        case IOCTLCode::ReadBaseAddress: 
-
-            if (RequestBufferSize == sizeof(_ba)) {
-                pba req = (pba)(Irp->AssociatedIrp.SystemBuffer);
-                RequestStatus = get_image_base(req);
-                RequestResponseSize = sizeof(_rw);
-            }
-            else {
-                RequestStatus = STATUS_INFO_LENGTH_MISMATCH;
-            }
-
-            break;
-
-        case IOCTLCode::DTB: {
-
-            if (RequestBufferSize == sizeof sizeof(_dtb)) {
-                dtbl req = (dtbl)(Irp->AssociatedIrp.SystemBuffer); 
-                RequestStatus = FixDTB(req);
-                RequestResponseSize = sizeof(_dtb);
-            }
-            else {
-                RequestStatus = STATUS_INFO_LENGTH_MISMATCH;
-            }
-
+        if (RequestBufferSize == sizeof(_rw)) {
+            prw req = (prw)(Irp->AssociatedIrp.SystemBuffer);
+            RequestStatus = ReadWriteHandler(req);
+            RequestResponseSize = sizeof(_rw);
         }
+        else {
+            RequestStatus = STATUS_INFO_LENGTH_MISMATCH;
+        }
+        break;
 
-        default:
-            RequestStatus = STATUS_INVALID_DEVICE_REQUEST;
+    case IOCTLCode::ReadBaseAddress:
 
+        if (RequestBufferSize == sizeof(_ba)) {
+            pba req = (pba)(Irp->AssociatedIrp.SystemBuffer);
+            RequestStatus = get_image_base(req);
+            RequestResponseSize = sizeof(_rw);
+        }
+        else {
+            RequestStatus = STATUS_INFO_LENGTH_MISMATCH;
+        }
+        break;
+
+    case IOCTLCode::DTB: 
+
+        if (RequestBufferSize == sizeof(_dtb)) {
+            dtbl req = (dtbl)(Irp->AssociatedIrp.SystemBuffer);
+            RequestStatus = FixDTB(req);
+            RequestResponseSize = sizeof(_dtb);
+        }
+        else {
+            RequestStatus = STATUS_INFO_LENGTH_MISMATCH;
+        }
+        break;
+
+    default:
+        RequestStatus = STATUS_INVALID_DEVICE_REQUEST;
     }
 
     Irp->IoStatus.Status = RequestStatus;
@@ -130,16 +128,16 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
     RtlInitUnicodeString(&symbolicLinkName, SYMBOLIC_LINK_NAME);
     PDEVICE_OBJECT deviceObject;
 
-    NTSTATUS driverInitilizationStatus = IoCreateDevice(DriverObject, 0, &deviceName, FILE_DEVICE_UNKNOWN, 0, FALSE, &deviceObject);
+    NTSTATUS driverInitializationStatus = IoCreateDevice(DriverObject, 0, &deviceName, FILE_DEVICE_UNKNOWN, 0, FALSE, &deviceObject);
 
-    if (!NT_SUCCESS(driverInitilizationStatus)) {
-        return driverInitilizationStatus;
+    if (!NT_SUCCESS(driverInitializationStatus)) {
+        return driverInitializationStatus;
     }
 
-    driverInitilizationStatus = IoCreateSymbolicLink(&symbolicLinkName, &deviceName);
-    if (!NT_SUCCESS(driverInitilizationStatus)) {
+    driverInitializationStatus = IoCreateSymbolicLink(&symbolicLinkName, &deviceName);
+    if (!NT_SUCCESS(driverInitializationStatus)) {
         IoDeleteDevice(deviceObject);
-        return driverInitilizationStatus;
+        return driverInitializationStatus;
     }
 
     for (int i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; i++) {
@@ -148,6 +146,20 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
 
     DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DeviceController;
     DriverObject->DriverUnload = UnloadDriver;
+
+    requestCrypter = static_cast<RequestCrypter*>(ExAllocatePool2(NonPagedPool, sizeof(RequestCrypter), TAG_NAME));
+    driverInitializationStatus = requestCrypter->Initialize();
+
+    if (!NT_SUCCESS(driverInitializationStatus)) {
+        IoDeleteSymbolicLink(&symbolicLinkName);
+        IoDeleteDevice(DriverObject->DeviceObject);
+        if (requestCrypter != NULL) {
+            ExFreePoolWithTag(requestCrypter, TAG_NAME);
+            requestCrypter = NULL;
+        }
+        requestCrypter = nullptr;
+        return driverInitializationStatus;
+    }
 
     return STATUS_SUCCESS;
 
@@ -171,13 +183,12 @@ void UnloadDriver(PDRIVER_OBJECT DriverObject) {
 
 }
 
-/*  TODO:
-*       1. In my requests, make sure you are copying memory to the output buffer correctly
-*       2. Make dedicated function using template for writing to output buffer called IOCTLRequestResponseGenerator or something like that
-*       3. Remove illegal comments and rename everything to not be sus
-*       4. Create IOCTLRequestHandler which wraps all of our switch cases and calls our RequestResponseGenerator
-*       5. Encrypt / cipher our IOCTL parameters and output ( Do NOT encrypt the IOCTL code or we will probably get clapped )
-*       6. Create an authentication mechanism for our usermode where if our requests dont have a specific parameter, we call readMemoryUsage
-*       7. Update usermode interface to work with our new IOCTL codes
-*       8. Refactor the bad code (everything outside this file and non-shit-code folder)
+/* TODO:
+*       1. Make dedicated function using template for writing to output buffer called IOCTLRequestResponseGenerator or something like that
+*       2. Remove illegal comments and rename everything to not be sus
+*       3. Create IOCTLRequestHandler which wraps all of our switch cases and calls our RequestResponseGenerator
+*       4. Fix our encrypt / decrypt functions to use padding and then call them
+*       5. Create an authentication mechanism for our usermode where if our requests dont have a specific parameter, we call readMemoryUsage
+*       6. Update usermode interface to work with our new IOCTL codes
+*       7. Refactor the bad code (everything outside this file and non-shit-code folder)
 */
