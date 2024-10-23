@@ -3,11 +3,6 @@
 #include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib") // Sadly we got to use this crap since theres nothing else for kernel mode
 
-enum CryptType {
-    ENCRYPT,
-    DECRYPT
-};
-
 class RequestCrypter {
 
 private:
@@ -23,5 +18,7 @@ public:
     ~RequestCrypter();
     void SetAESKey(const UCHAR* aesKey);
     NTSTATUS Initialize();
-    NTSTATUS CryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG OutputSize, CryptType CryptType);
+    NTSTATUS EncryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG OutputSize);
+    NTSTATUS DecryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG OutputSize);
+
 };

@@ -48,46 +48,48 @@ NTSTATUS RequestCrypter::Initialize() {
 
 }
 
-NTSTATUS RequestCrypter::CryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG OutputSize, CryptType CryptType) { // Better to work w pVoid & not templates due to dynamic sizes
+NTSTATUS RequestCrypter::EncryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG OutputSize) { // Better to work w pVoid & not templates due to dynamic sizes
 
     if (!hKey || !hAlg) { return STATUS_INVALID_HANDLE; }
     if (!pInput || !pOutput) { return STATUS_INVALID_PARAMETER; }
 
-    // Check if size is multiple of AES block size (16 bytes) - We could try to create PKCS7 padding obj and pass it to bcrypt function but idk
-    if (InputSize % 16 != 0) return STATUS_INVALID_PARAMETER;
+    // We should try to create PKCS7 padding obj and pass it to bcrypt function but idk
 
     ULONG cbResult = 0; // Dont know if this shit can just be null tbh
-    if (CryptType == CryptType::ENCRYPT) {
+    return BCryptEncrypt(
+        hKey,
+        (PUCHAR)pInput,
+        InputSize,
+        NULL,
+        NULL,
+        0,
+        (PUCHAR)pOutput,
+        OutputSize, 
+        &cbResult,
+        0
+    );
 
-        return BCryptEncrypt(
-            hKey,
-            (PUCHAR)pInput,
-            InputSize,
-            NULL,
-            NULL,
-            0,
-            (PUCHAR)pOutput,
-            OutputSize,
-            &cbResult,
-            0
-        );
+}
 
-    }
-    else {
+NTSTATUS RequestCrypter::DecryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG OutputSize) {
 
-        return BCryptDecrypt(
-            hKey,
-            (PUCHAR)pInput,
-            InputSize,
-            NULL,
-            NULL,
-            0,
-            (PUCHAR)pOutput,
-            OutputSize,
-            &cbResult,
-            0
-        );
+    if (!hKey || !hAlg) { return STATUS_INVALID_HANDLE; }
+    if (!pInput || !pOutput) { return STATUS_INVALID_PARAMETER; }
 
-    }
+    if (InputSize % 16 != 0) { return STATUS_INVALID_PARAMETER; } // The buffer should be following PKCS7 standards and be padded from usermode - We remove padding after decryption
+
+    ULONG cbResult = 0; // Still dont know if this shit can be null
+    return BCryptDecrypt(
+        hKey,
+        (PUCHAR)pInput,
+        InputSize,
+        NULL,
+        NULL,
+        0,
+        (PUCHAR)pOutput,
+        OutputSize,
+        &cbResult,
+        0
+    );
 
 }
