@@ -17,6 +17,29 @@ RequestCrypter::~RequestCrypter() {
     if (hAlg) { BCryptCloseAlgorithmProvider(hAlg, 0); }
 }
 
+NTSTATUS RequestCrypter::RemovePadding(PVOID pBuffer, ULONG BufferSize, ULONG& UnpaddedBufferSize) {
+
+    if (!pBuffer || BufferSize == 0 || !UnpaddedBufferSize) { return STATUS_INVALID_PARAMETER; }
+    if (BufferSize % AES_BLOCK_SIZE != 0) { return STATUS_INVALID_PARAMETER; }
+
+    PUCHAR byteBuffer = static_cast<PUCHAR>(pBuffer);
+    UCHAR paddingLen = byteBuffer[BufferSize - 1];
+
+    if (paddingLen == 0 || paddingLen > AES_BLOCK_SIZE || paddingLen > BufferSize) {
+        return STATUS_DATA_ERROR;
+    }
+
+    for (UCHAR i = 1; i <= paddingLen; i++) { // Since we are just checking, if we can ensure our data will be valid each time, we can remove this check for performance
+        if (byteBuffer[BufferSize - i] != paddingLen) {
+            return STATUS_DATA_ERROR;
+        }
+    }
+
+    UnpaddedBufferSize = BufferSize - paddingLen;
+    return STATUS_SUCCESS;
+
+}
+
 void RequestCrypter::SetAESKey(const UCHAR* aesKey) {
     RtlCopyMemory(m_aesKey, aesKey, 16 * sizeof(UCHAR));
 }
@@ -48,7 +71,7 @@ NTSTATUS RequestCrypter::Initialize() {
 
 }
 
-NTSTATUS RequestCrypter::EncryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG OutputSize) { // Better to work w pVoid & not templates due to dynamic sizes
+NTSTATUS RequestCrypter::EncryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG& OutputSize) { // Better to work w pVoid & not templates due to dynamic sizes
 
     if (!hKey || !hAlg) { return STATUS_INVALID_HANDLE; }
     if (!pInput || !pOutput) { return STATUS_INVALID_PARAMETER; }
@@ -71,15 +94,17 @@ NTSTATUS RequestCrypter::EncryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOut
 
 }
 
-NTSTATUS RequestCrypter::DecryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG OutputSize) {
+NTSTATUS RequestCrypter::DecryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG& OutputSize) {
 
     if (!hKey || !hAlg) { return STATUS_INVALID_HANDLE; }
     if (!pInput || !pOutput) { return STATUS_INVALID_PARAMETER; }
 
-    if (InputSize % 16 != 0) { return STATUS_INVALID_PARAMETER; } // The buffer should be following PKCS7 standards and be padded from usermode - We remove padding after decryption
+    if (InputSize % AES_BLOCK_SIZE != 0) { return STATUS_INVALID_PARAMETER; } // The buffer should be following PKCS7 standards and be padded from usermode - We remove padding after decryption
 
+    NTSTATUS DecryptionStatus;
     ULONG cbResult = 0; // Still dont know if this shit can be null
-    return BCryptDecrypt(
+
+    DecryptionStatus =  BCryptDecrypt(
         hKey,
         (PUCHAR)pInput,
         InputSize,
@@ -91,5 +116,12 @@ NTSTATUS RequestCrypter::DecryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOut
         &cbResult,
         0
     );
+
+    if (!BCRYPT_SUCCESS(DecryptionStatus)){
+        return DecryptionStatus;
+    } 
+
+    DecryptionStatus = RemovePadding(pOutput, cbResult, OutputSize);
+    return DecryptionStatus;
 
 }
