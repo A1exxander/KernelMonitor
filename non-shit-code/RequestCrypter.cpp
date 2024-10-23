@@ -48,7 +48,7 @@ NTSTATUS RequestCrypter::Initialize() {
 
 }
 
-NTSTATUS RequestCrypter::EncryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG OutputSize) { // Better to work w pVoid & not templates due to dynamic sizes
+NTSTATUS RequestCrypter::CryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG OutputSize, CryptType CryptType) { // Better to work w pVoid & not templates due to dynamic sizes
 
     if (!hKey || !hAlg) { return STATUS_INVALID_HANDLE; }
     if (!pInput || !pOutput) { return STATUS_INVALID_PARAMETER; }
@@ -57,40 +57,37 @@ NTSTATUS RequestCrypter::EncryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOut
     if (InputSize % 16 != 0) return STATUS_INVALID_PARAMETER;
 
     ULONG cbResult = 0; // Dont know if this shit can just be null tbh
-    return BCryptEncrypt(
-        hKey,
-        (PUCHAR)pInput,
-        InputSize,
-        NULL,
-        NULL,
-        0,
-        (PUCHAR)pOutput,
-        OutputSize, 
-        &cbResult,
-        0
-    );
+    if (CryptType == CryptType::ENCRYPT) {
 
-}
+        return BCryptEncrypt(
+            hKey,
+            (PUCHAR)pInput,
+            InputSize,
+            NULL,
+            NULL,
+            0,
+            (PUCHAR)pOutput,
+            OutputSize,
+            &cbResult,
+            0
+        );
 
-NTSTATUS RequestCrypter::DecryptBuffer(PVOID pInput, ULONG InputSize, PVOID pOutput, ULONG OutputSize) {
+    }
+    else {
 
-    if (!hKey || !hAlg) { return STATUS_INVALID_HANDLE; }
-    if (!pInput || !pOutput) { return STATUS_INVALID_PARAMETER; }
+        return BCryptDecrypt(
+            hKey,
+            (PUCHAR)pInput,
+            InputSize,
+            NULL,
+            NULL,
+            0,
+            (PUCHAR)pOutput,
+            OutputSize,
+            &cbResult,
+            0
+        );
 
-    if (InputSize % 16 != 0) return STATUS_INVALID_PARAMETER;
-
-    ULONG cbResult = 0; // Still dont know if this shit can be null
-    return BCryptDecrypt(
-        hKey,
-        (PUCHAR)pInput,
-        InputSize,
-        NULL,
-        NULL,
-        0,
-        (PUCHAR)pOutput,
-        OutputSize,
-        &cbResult,
-        0
-    );
+    }
 
 }
