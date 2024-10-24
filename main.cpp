@@ -1,10 +1,11 @@
 #pragma once
 #pragma warning(disable:4100)
+#pragma warning(disable:4005)
+#pragma warning(disable:4083)
 #include <ntifs.h>
 #include "depend/kli.hpp"
 #include "depend/structs.h"
 #include "depend/sk.h"
-
 extern "C" PVOID NTAPI PsGetProcessSectionBaseAddress(PEPROCESS Process);
 
 ULONGLONG m_stored_dtb;
@@ -14,12 +15,12 @@ ULONGLONG m_stored_dtb;
 #include "req/read_write.h"
 
 #include <ntddk.h>
-#include "non-shit-code/IOCTLRequestExecutor.h"
+#include "non-shit-code/RequestExecutor.h"
 #include "non-shit-code/RequestCrypter.h"
+#include "non-shit-code/Globals.h"
 
 constexpr auto DEVICE_NAME = L"\\Device\\SystemResourceMonitoringTechnologies"; // A kernel mode driver to monitor hardware components directly and do the occasional funny trick
 constexpr auto SYMBOLIC_LINK_NAME = L"\\DosDevices\\SystemResourceMonitoringTechnologies";
-constexpr auto TAG_NAME = 'KMHM';
 
 void UnloadDriver(PDRIVER_OBJECT DriverObject);
 NTSTATUS UnsupportedDispatch(PDEVICE_OBJECT DeviceObject, PIRP Irp);
@@ -50,25 +51,26 @@ NTSTATUS DeviceController(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 
     case IOCTLCode::DetectCheat:
 
-        IOCTLRequestExecutor::DetectCheat(0xDE7EC7ED);
+        RequestExecutor::DetectCheat(0xDE7EC7ED);
         break;
 
     case IOCTLCode::ReadCPUTemp:
     
         ULONG32 CPUTemp;
-        RequestStatus = IOCTLRequestExecutor::ReadCPUTemp(CPUTemp);
+        RequestStatus = RequestExecutor::ReadCPUTemp(CPUTemp);
         RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &CPUTemp, sizeof(CPUTemp)); // Create a function that can do this for us w any value
         Irp->IoStatus.Information = sizeof(CPUTemp);
         break;
 
     case IOCTLCode::ReadGPUTemp:
         //IOCTLRequestHandler::ReadGPUTemp();
+        RequestStatus = STATUS_NOT_IMPLEMENTED;
         break;
 
     case IOCTLCode::ReadMemoryUsage:
    
         ULONG64 RAMUsageMB;
-        RequestStatus = IOCTLRequestExecutor::ReadRAMUsage(RAMUsageMB);
+        RequestStatus = RequestExecutor::ReadRAMUsage(RAMUsageMB);
         RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &RAMUsageMB, sizeof(RAMUsageMB));
         Irp->IoStatus.Information = sizeof(RAMUsageMB);
         break;
